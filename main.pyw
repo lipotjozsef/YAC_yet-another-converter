@@ -1,4 +1,5 @@
 from sys import argv, platform
+from sys import exit as sysExit
 from subprocess import CREATE_NO_WINDOW, PIPE, Popen
 from os import mkdir, startfile, environ
 from os.path import isdir, basename, abspath, join, exists, dirname
@@ -14,10 +15,11 @@ from urllib.request import urlretrieve
 
 myVersion: str = "0.9.0"
 
-myPath = abspath("converted/")
+currentPath = dirname(argv[0])
+myPath = abspath(join(currentPath,"converted"))
 currentDate: str = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
 outPath = join(myPath, currentDate)
-logPath = abspath("lastlog.txt")
+logPath = abspath(join(currentPath,"lastlog.txt"))
 
 root: Tk = Tk()
 fileBar: Progressbar = Progressbar(root, orient="horizontal", length=125)
@@ -30,8 +32,6 @@ root.resizable(False, False)
 root.geometry(f'200x200+{root.winfo_pointerx()}+{root.winfo_pointery()}')
 
 rArgs: list= argv[1:]
-
-barFillerValue : float = 100 / len(rArgs)
 
 # monkey patch from user github - thank god
 # https://github.com/kkroening/ffmpeg-python/issues/686#issuecomment-2664474089
@@ -62,11 +62,13 @@ ffmpeg._run.run_async = patched_run_async
 
 if len(rArgs) == 0:
     messagebox.showerror("Hiba!", "Nem adott meg fáljt!\nKilépés.")
-    exit(-1)
+    sysExit(-1)
 
 if isdir(rArgs[0]):
     messagebox.showerror("Hiba!", "Mappákat nem lehet átalakítani!")
-    exit(-1)
+    sysExit(-1)
+
+barFillerValue : float = 100 / len(rArgs)
 
 def main():
 
@@ -102,7 +104,12 @@ def processFile(filePath: str, formats: list[str], myExt: str):
     fileBasename, fileExt = fileName.split('.')
     myOutput =join(outPath, fileBasename+myExt)
     if fileExt in formats:
-        ffmpeg.input(filePath).output(myOutput, loglevel="quiet").run()
+        try:
+            ffmpeg.input(filePath).output(myOutput, loglevel="quiet").run()
+        except Exception as e:
+            messagebox.showerror("Hiba!", f"A fálj nem található.\nValószínűleg az ffmpeg.exe nincs egy mappában ezzel az exe-vel.\nMásolja be és próbálja újra.\nFálj eléresi útja: {currentPath}")
+            startfile(currentPath)
+            writeToLog(e, False)
         return True
     return False
     
@@ -128,6 +135,13 @@ def checkForUpdate():
     if currentVersion != myVersion:
         urlretrieve("https://raw.githubusercontent.com/lipotjozsef/YAC_yet-another-converter/refs/heads/main/main.pyw", argv[0])
 
+def writeToLog(exp:Exception, show: bool = True):
+    with open(logPath, "w", encoding="utf-8") as f:
+        f.write(f"{str(exp)}\nLogged at {currentDate}")
+        if show:
+            messagebox.showerror("Hiba!", "Valami hiba történt a program futása során!\nEllenőrizze a hiba kódot a szöveges fáljban.")
+            startfile(logPath)
+        sysExit()
 
 if __name__ == "__main__":
     try:
@@ -135,5 +149,4 @@ if __name__ == "__main__":
         checkForUpdate()
         main()
     except Exception as e:
-        with open(logPath, "w") as f:
-            f.write(f"{str(e)}\nLogged at {currentDate}")
+        writeToLog(e)
