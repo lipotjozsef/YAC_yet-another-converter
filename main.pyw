@@ -133,7 +133,7 @@ def checkForUpdate():
     currentVersion: str = newestVersion.text if len(newestVersion.text) < 10 else ""
     newestVersion.close()
     if currentVersion != myVersion:
-        urlretrieve("https://raw.githubusercontent.com/lipotjozsef/YAC_yet-another-converter/refs/heads/main/main.pyw", argv[0])
+        urlretrieve("https://github.com/lipotjozsef/YAC_yet-another-converter/blob/main/update/update_YAC.exe", join(currentPath,"YAC"))
 
 def writeToLog(exp:Exception, show: bool = True):
     with open(logPath, "w", encoding="utf-8") as f:
