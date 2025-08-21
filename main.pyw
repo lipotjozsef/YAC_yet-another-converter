@@ -1,13 +1,18 @@
 from sys import argv, platform
 from subprocess import CREATE_NO_WINDOW, PIPE, Popen
-from os import mkdir, startfile
-from os.path import isdir, basename, abspath, join, exists
+from os import mkdir, startfile, environ
+from os.path import isdir, basename, abspath, join, exists, dirname
 from datetime import datetime
 from tkinter import Tk, Button, StringVar, OptionMenu, messagebox
 from tkinter.ttk import Progressbar
 import ffmpeg
 from ffmpeg._run import output_operator
 from formats import getFormats
+from requests import get, Response
+from win32com.client import Dispatch
+from urllib.request import urlretrieve
+
+myVersion: str = "0.9.0"
 
 myPath = abspath("converted/")
 currentDate: str = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
@@ -72,7 +77,7 @@ def main():
     Button(root, text="Kezdés", command=lambda: startProcess(myFormats, selectedExt.get())).grid(row = 1, column = 0, sticky='new', padx = 50, pady=10)
     fileBar.grid(row = 2, column = 0, sticky='n')
     if not exists(logPath):
-        mkdir(logPath)
+        _ = open(logPath, "x")
 
     if not exists(myPath):
         mkdir(myPath)
@@ -101,9 +106,33 @@ def processFile(filePath: str, formats: list[str], myExt: str):
         return True
     return False
     
+def createShortcut(target, shortcut_name, working_dir=None, icon=None):
+    # Get Desktop path
+    desktop = join(environ["USERPROFILE"], "Desktop")
+    shortcut_path = join(desktop, f"{shortcut_name}.lnk")
+
+    if exists(shortcut_path): return
+
+    # Create shortcut
+    shell = Dispatch("WScript.Shell")
+    shortcut = shell.CreateShortcut(shortcut_path)
+    shortcut.TargetPath = target
+    shortcut.WorkingDirectory = working_dir or dirname(target)
+    shortcut.IconLocation = icon or target
+    shortcut.save()
+
+def checkForUpdate():
+    newestVersion: Response = get("https://raw.githubusercontent.com/lipotjozsef/YAC_yet-another-converter/refs/heads/main/version.txt", timeout=5.0)
+    currentVersion: str = newestVersion.text if len(newestVersion.text) < 10 else ""
+    newestVersion.close()
+    if currentVersion != myVersion:
+        urlretrieve("https://raw.githubusercontent.com/lipotjozsef/YAC_yet-another-converter/refs/heads/main/main.pyw", argv[0])
+
 
 if __name__ == "__main__":
     try:
+        createShortcut(abspath(argv[0]), f"YAC - Yet Another Converter {myVersion}")
+        checkForUpdate()
         main()
     except Exception as e:
         with open(logPath, "w") as f:
