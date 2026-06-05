@@ -2,7 +2,7 @@ video_formats : list[str] = ["mp4", "mov", "avi", "mkv", "wmv", "flv", "webm", "
 
 audio_formats : list[str] = ["mp3", "wav", "flac", "aac", "ogg", "wma", "m4a", "aiff", "aif"]
 
-image_formats : list[str] = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "webp", "heic"]
+image_formats : list[str] = ["jpg", "jpeg", "avif", "png", "gif", "bmp", "tiff", "tif", "webp", "heic", "svg", "ico"]
 
 allFormats : list[list[str]] = [video_formats, audio_formats, image_formats]
 

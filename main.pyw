@@ -3,8 +3,9 @@ from sys import exit as sysExit
 from subprocess import CREATE_NO_WINDOW, PIPE, Popen
 from os import mkdir, startfile, environ
 from os.path import isdir, basename, abspath, join, exists, dirname
+from pathlib import Path
 from datetime import datetime
-from tkinter import Tk, Button, StringVar, OptionMenu, messagebox
+from tkinter import Tk, Button, StringVar, OptionMenu, messagebox, filedialog
 from tkinter.ttk import Progressbar
 import ffmpeg
 from ffmpeg._run import output_operator
@@ -13,7 +14,33 @@ from requests import get, Response
 from win32com.client import Dispatch
 from urllib.request import urlretrieve
 
-myVersion: str = "0.9.0"
+myVersion: str = "0.9.1"
+
+rArgs: list= argv[1:]
+
+if len(rArgs) == 0:
+    downloadsPath: str = join(Path.home(),"Downloads")
+    files: tuple[str] = filedialog.askopenfilenames(initialdir=downloadsPath)
+    
+    if len(files) == 0: 
+        sysExit(-1)
+    else:
+        rArgs = list(files)
+
+if isdir(rArgs[0]):
+    messagebox.showerror("Hiba!", "Mappákat nem lehet átalakítani!")
+    sysExit(-1)
+
+root: Tk = Tk()
+root.columnconfigure(0, weight=1)
+root.rowconfigure(0, weight=1)
+root.rowconfigure(1, weight=1)
+root.rowconfigure(2, weight=1)
+root.title("YAC - Yet Another Converter")
+root.resizable(False, False)
+
+root.attributes("-topmost", True)
+root.geometry(f'200x200+{root.winfo_pointerx()}+{root.winfo_pointery()}')
 
 currentPath = dirname(argv[0])
 myPath = abspath(join(currentPath,"converted"))
@@ -21,19 +48,10 @@ currentDate: str = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
 outPath = join(myPath, currentDate)
 logPath = abspath(join(currentPath,"lastlog.txt"))
 
-root: Tk = Tk()
 fileBar: Progressbar = Progressbar(root, orient="horizontal", length=125)
-root.columnconfigure(0, weight=1)
-root.rowconfigure(0, weight=1)
-root.rowconfigure(1, weight=1)
-root.rowconfigure(2, weight=1)
-root.title("YAC - Yet Another Converter")
-root.resizable(False, False)
-root.geometry(f'200x200+{root.winfo_pointerx()}+{root.winfo_pointery()}')
+barFillerValue : float = 100.0 / max(len(rArgs), 1)
 
-rArgs: list= argv[1:]
-
-# monkey patch from user github - thank god
+# monkey patch from github user - thank god
 # https://github.com/kkroening/ffmpeg-python/issues/686#issuecomment-2664474089
 @output_operator()
 def patched_run_async(
@@ -60,49 +78,44 @@ def patched_run_async(
 
 ffmpeg._run.run_async = patched_run_async
 
-if len(rArgs) == 0:
-    messagebox.showerror("Hiba!", "Nem adott meg fáljt!\nKilépés.")
-    sysExit(-1)
-
-if isdir(rArgs[0]):
-    messagebox.showerror("Hiba!", "Mappákat nem lehet átalakítani!")
-    sysExit(-1)
-
-barFillerValue : float = 100 / len(rArgs)
-
-def main():
+def main() -> None:
 
     myFormats: str = getFormats(basename(rArgs[0]))
     
     selectedExt: StringVar = StringVar(value=myFormats[0])
+
     OptionMenu(root, selectedExt, *myFormats).grid(row = 0, column = 0, sticky='sew', padx = 50)
     Button(root, text="Kezdés", command=lambda: startProcess(myFormats, selectedExt.get())).grid(row = 1, column = 0, sticky='new', padx = 50, pady=10)
     fileBar.grid(row = 2, column = 0, sticky='n')
+
     if not exists(logPath):
         _ = open(logPath, "x")
-
     if not exists(myPath):
         mkdir(myPath)
 
 
     root.mainloop()
 
-def startProcess(myFormats: list[str], selectedExt: str):
+def startProcess(myFormats: list[str], selectedExt: str) -> None:
     if not exists(outPath):
         mkdir(outPath)
+    
     allsum = 0
     for filePath in rArgs:
         if processFile(abspath(filePath), myFormats, '.'+selectedExt):
             allsum += 1
             fileBar["value"] += barFillerValue
+    
     messagebox.showinfo("Információ", f"Kész az átalakítás!\n{allsum}/{len(rArgs)} fálj átalakítva")
     startfile(outPath)
+
     root.destroy()
 
-def processFile(filePath: str, formats: list[str], myExt: str):
+def processFile(filePath: str, formats: list[str], myExt: str) -> None:
     fileName = basename(filePath)
     fileBasename, fileExt = fileName.split('.')
     myOutput =join(outPath, fileBasename+myExt)
+
     if fileExt in formats:
         try:
             ffmpeg.input(filePath).output(myOutput, loglevel="quiet").run()
@@ -110,10 +123,11 @@ def processFile(filePath: str, formats: list[str], myExt: str):
             messagebox.showerror("Hiba!", f"A fálj nem található.\nValószínűleg az ffmpeg.exe nincs egy mappában ezzel az exe-vel.\nMásolja be és próbálja újra.\nFálj eléresi útja: {currentPath}")
             startfile(currentPath)
             writeToLog(e, False)
+        
         return True
     return False
     
-def createShortcut(target, shortcut_name, working_dir=None, icon=None):
+def createShortcut(target, shortcut_name, working_dir=None, icon=None) -> None:
     # Get Desktop path
     desktop = join(environ["USERPROFILE"], "Desktop")
     shortcut_path = join(desktop, f"{shortcut_name}.lnk")
@@ -128,14 +142,14 @@ def createShortcut(target, shortcut_name, working_dir=None, icon=None):
     shortcut.IconLocation = icon or target
     shortcut.save()
 
-def checkForUpdate():
+def checkForUpdate() -> None:
     newestVersion: Response = get("https://raw.githubusercontent.com/lipotjozsef/YAC_yet-another-converter/refs/heads/main/version.txt", timeout=5.0)
     currentVersion: str = newestVersion.text if len(newestVersion.text) < 10 else ""
     newestVersion.close()
     if currentVersion != myVersion:
         urlretrieve("https://github.com/lipotjozsef/YAC_yet-another-converter/blob/main/update/update_YAC.exe", join(currentPath,"YAC"))
 
-def writeToLog(exp:Exception, show: bool = True):
+def writeToLog(exp:Exception, show: bool = True) -> None:
     with open(logPath, "w", encoding="utf-8") as f:
         f.write(f"{str(exp)}\nLogged at {currentDate}")
         if show:
